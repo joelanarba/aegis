@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    import { collections } from "@/lib/firestore";
+    const { collections } = await import("@/lib/firestore");
     const userIdParam = request.nextUrl.searchParams.get("userId");
     
     let usersToProcess = [];
