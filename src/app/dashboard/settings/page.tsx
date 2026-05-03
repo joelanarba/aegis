@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   SettingsIcon,
   MessageSquareIcon,
@@ -18,6 +18,22 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState("UTC");
   const [digestFreq, setDigestFreq] = useState("daily");
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Load current preferences on mount
+  useEffect(() => {
+    fetch("/api/settings")
+      .then(res => res.json())
+      .then(data => {
+        if (data.preferences) {
+          setChatId(data.preferences.telegramChatId || "");
+          setTimezone(data.preferences.timezone || "UTC");
+          setDigestFreq(data.preferences.digestFrequency || "daily");
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -64,11 +80,16 @@ export default function SettingsPage() {
             </label>
             <input
               type="text"
-              value={chatId}
+              value={loading ? "" : chatId}
               onChange={(e) => setChatId(e.target.value)}
-              placeholder="Your Telegram chat ID (get from @userinfobot)"
+              placeholder={loading ? "Loading..." : "Your Telegram chat ID (get from @userinfobot)"}
               style={{ width: "100%" }}
             />
+            {chatId && !loading && (
+              <p style={{ fontSize: "0.75rem", color: "var(--success)", marginTop: "0.5rem" }}>
+                ✓ Telegram linked to Chat ID: {chatId}
+              </p>
+            )}
             <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.5rem" }}>
               Message <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer">@userinfobot</a> on Telegram to get your Chat ID.
             </p>
