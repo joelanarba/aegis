@@ -173,10 +173,10 @@ export async function POST(request: NextRequest) {
         console.error(`Failed to process email ${email.id}:`, emailError);
         await updateEmail(email.id, { status: "error" });
       }
-
-      totalProcessed += processed;
     }
 
+    totalProcessed += processed;
+  }
     return NextResponse.json({ status: "ok", processed: totalProcessed });
   } catch (error) {
     console.error("Process queue error:", error);
