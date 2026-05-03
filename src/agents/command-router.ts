@@ -13,6 +13,7 @@ import { generateDigest } from "./digest-generator";
 export interface CommandResult {
   text: string;
   parseMode?: "Markdown" | "MarkdownV2" | "HTML";
+  replyMarkup?: any;
 }
 
 /**
@@ -58,6 +59,37 @@ export async function routeCommand(
 
   // Natural language — use AI to detect intent
   return handleNaturalLanguage(userId, trimmed, userTimezone);
+}
+
+// ─── Callback Handlers ───
+
+export async function routeCallback(userId: string, data: string): Promise<CommandResult> {
+  const [action, type, id] = data.split("_");
+
+  try {
+    if (action === "approve") {
+      if (type === "draft") {
+        await collections.drafts().doc(id).update({ status: "approved", updatedAt: new Date() });
+        return { text: "✅ Draft approved!" };
+      } else if (type === "event") {
+        await collections.pendingEvents().doc(id).update({ status: "approved" });
+        return { text: "✅ Event approved!" };
+      }
+    } else if (action === "reject") {
+      if (type === "draft") {
+        await collections.drafts().doc(id).update({ status: "rejected", updatedAt: new Date() });
+        return { text: "❌ Draft rejected." };
+      } else if (type === "event") {
+        await collections.pendingEvents().doc(id).update({ status: "rejected" });
+        return { text: "❌ Event rejected." };
+      }
+    }
+  } catch (err) {
+    console.error("Callback error:", err);
+    return { text: "⚠️ Error processing request." };
+  }
+
+  return { text: "Unknown action" };
 }
 
 // ─── Command Handlers ───
@@ -139,13 +171,22 @@ async function handleDrafts(userId: string): Promise<CommandResult> {
   }
 
   let text = `✏️ *Pending Drafts \\(${drafts.length}\\)*\n\n`;
-  for (const draft of drafts.slice(0, 5)) {
-    const preview = escMd(draft.content.slice(0, 100));
-    text += `• \\[${draft.tone}\\] ${preview}\\.\\.\\.\n\n`;
-  }
-  text += "_Review and approve drafts on the web dashboard\\._";
+  const inline_keyboard: any[][] = [];
 
-  return { text };
+  drafts.slice(0, 5).forEach((draft, idx) => {
+    const preview = escMd(draft.content.slice(0, 100));
+    text += `*${idx + 1}\\.* \\[${draft.tone}\\] ${preview}\\.\\.\\.\n\n`;
+    
+    inline_keyboard.push([
+      { text: `✅ Approve #${idx + 1}`, callback_data: `approve_draft_${draft.id}` },
+      { text: `❌ Reject #${idx + 1}`, callback_data: `reject_draft_${draft.id}` }
+    ]);
+  });
+
+  return { 
+    text,
+    replyMarkup: { inline_keyboard }
+  };
 }
 
 async function handleEvents(userId: string): Promise<CommandResult> {
@@ -156,16 +197,25 @@ async function handleEvents(userId: string): Promise<CommandResult> {
   }
 
   let text = "📅 *Pending Events*\n\n";
-  for (const event of events) {
+  const inline_keyboard: any[][] = [];
+
+  events.slice(0, 5).forEach((event, idx) => {
     const start = event.startTime instanceof Date
       ? event.startTime
       : (event.startTime as { toDate: () => Date }).toDate();
     const timeStr = start.toLocaleString();
-    text += `• *${escMd(event.title)}*\n  📍 ${escMd(timeStr)}\n\n`;
-  }
-  text += "_Approve events on the web dashboard\\._";
+    text += `*${idx + 1}\\.* *${escMd(event.title)}*\n  📍 ${escMd(timeStr)}\n\n`;
 
-  return { text };
+    inline_keyboard.push([
+      { text: `✅ Approve #${idx + 1}`, callback_data: `approve_event_${event.id}` },
+      { text: `❌ Reject #${idx + 1}`, callback_data: `reject_event_${event.id}` }
+    ]);
+  });
+
+  return { 
+    text,
+    replyMarkup: { inline_keyboard }
+  };
 }
 
 async function handleReminders(userId: string): Promise<CommandResult> {

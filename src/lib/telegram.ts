@@ -13,13 +13,11 @@ interface TelegramResponse {
   description?: string;
 }
 
-/**
- * Send a plain text message to a Telegram chat.
- */
 export async function sendTelegramMessage(
   chatId: string,
   text: string,
-  parseMode: "Markdown" | "MarkdownV2" | "HTML" = "Markdown"
+  parseMode: "Markdown" | "MarkdownV2" | "HTML" | null = "Markdown",
+  replyMarkup?: any
 ): Promise<boolean> {
   const config = getConfig();
   if (!config.TELEGRAM_BOT_TOKEN) {
@@ -27,21 +25,48 @@ export async function sendTelegramMessage(
     return false;
   }
 
+  const payload: any = {
+    chat_id: chatId,
+    text,
+    disable_web_page_preview: true,
+  };
+
+  if (parseMode) payload.parse_mode = parseMode;
+  if (replyMarkup) payload.reply_markup = replyMarkup;
+
   const response = await fetch(`${TELEGRAM_API}${config.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: parseMode,
-      disable_web_page_preview: true,
-    }),
+    body: JSON.stringify(payload),
   });
 
   const data: TelegramResponse = await response.json();
   if (!data.ok) {
     console.error("Telegram send error:", data.description);
   }
+  return data.ok;
+}
+
+/**
+ * Answer a callback query (from an inline button press)
+ */
+export async function answerCallbackQuery(
+  callbackQueryId: string,
+  text?: string
+): Promise<boolean> {
+  const config = getConfig();
+  if (!config.TELEGRAM_BOT_TOKEN) return false;
+
+  const response = await fetch(`${TELEGRAM_API}${config.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      callback_query_id: callbackQueryId,
+      text: text,
+    }),
+  });
+
+  const data = await response.json();
   return data.ok;
 }
 
@@ -119,6 +144,37 @@ export async function sendDigestMessage(
 }
 
 /**
+ * Set up the Telegram bot command menu.
+ */
+export async function setTelegramCommands(): Promise<boolean> {
+  const config = getConfig();
+  if (!config.TELEGRAM_BOT_TOKEN) return false;
+
+  const commands = [
+    { command: "inbox", description: "Recent email summaries" },
+    { command: "urgent", description: "Items needing attention" },
+    { command: "drafts", description: "Pending reply drafts" },
+    { command: "events", description: "Upcoming calendar events" },
+    { command: "reminders", description: "Active reminders" },
+    { command: "research", description: "Search the web" },
+    { command: "digest", description: "Generate a digest now" },
+    { command: "help", description: "Show all commands" },
+  ];
+
+  const response = await fetch(
+    `${TELEGRAM_API}${config.TELEGRAM_BOT_TOKEN}/setMyCommands`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commands }),
+    }
+  );
+
+  const data: TelegramResponse = await response.json();
+  return data.ok;
+}
+
+/**
  * Set up a webhook for the Telegram bot.
  */
 export async function setTelegramWebhook(webhookUrl: string): Promise<boolean> {
@@ -132,7 +188,7 @@ export async function setTelegramWebhook(webhookUrl: string): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         url: webhookUrl,
-        allowed_updates: ["message"],
+        allowed_updates: ["message", "callback_query"],
       }),
     }
   );

@@ -149,6 +149,19 @@ export async function POST(request: NextRequest) {
           status: "processed",
         });
 
+        // Instant Notification for Urgent Emails
+        if ((triage.priority === "urgent" || triage.priority === "important") && user.preferences?.notifyUrgent !== false) {
+          const chatId = user.preferences?.telegramChatId;
+          if (chatId) {
+            const { sendUrgentEmailAlert } = await import("@/lib/telegram");
+            await sendUrgentEmailAlert(chatId, {
+              from: email.from,
+              subject: email.subject,
+              summary: summary.summary
+            });
+          }
+        }
+
         processed++;
       } catch (emailError) {
         console.error(`Failed to process email ${email.id}:`, emailError);

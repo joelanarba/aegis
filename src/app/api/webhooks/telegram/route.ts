@@ -13,7 +13,35 @@ export async function POST(request: NextRequest) {
   try {
     const update = await request.json();
 
-    // Telegram sends updates with a "message" field
+    // Check for callback query (inline button press)
+    if (update.callback_query) {
+      const cb = update.callback_query;
+      const chatId = String(cb.message.chat.id);
+      const data = cb.data; // e.g. "approve_draft_123"
+
+      console.log(`🔘 Telegram callback from ${chatId}: ${data}`);
+
+      // Find user
+      const usersSnapshot = await collections
+        .users()
+        .where("preferences.telegramChatId", "==", chatId)
+        .limit(1)
+        .get();
+
+      if (!usersSnapshot.empty) {
+        const userId = usersSnapshot.docs[0].id;
+        // Import routeCallback from command router (need to add it there)
+        const { routeCallback } = await import("@/agents/command-router");
+        const result = await routeCallback(userId, data);
+        
+        // Answer callback to stop loading spinner
+        const { answerCallbackQuery } = await import("@/lib/telegram");
+        await answerCallbackQuery(cb.id, result.text);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    // Otherwise, handle normal text message
     const message = update?.message;
     if (!message?.text || !message?.chat?.id) {
       return NextResponse.json({ ok: true });

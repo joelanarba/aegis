@@ -4,7 +4,13 @@ import "./landing.css";
 
 export const metadata: Metadata = {
   title: "Aegis — Personal AI Agent",
-  description: "Your intelligent digital assistant that monitors, summarizes, and acts on your behalf.",
+  description: "Your autonomous AI assistant for email and calendar management.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Aegis",
+  },
 };
 
 export default function RootLayout({
