@@ -1,5 +1,5 @@
 import { textCompletion } from "@/lib/openai";
-import { getProcessedEmails, getPendingDrafts, getPendingEvents, getActiveReminders } from "@/lib/firestore";
+import { getProcessedEmails, getPendingDrafts, getPendingEvents, getActiveReminders, collections } from "@/lib/firestore";
 import { parseReminder } from "./reminder-parser";
 import { storeReminder } from "@/lib/firestore";
 import { conductResearch } from "./researcher";
