@@ -27,26 +27,32 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Get all users — in a single-user system, there's just one
-    // For multi-user, you'd iterate through all users
-    const userId = request.nextUrl.searchParams.get("userId");
-    if (!userId) {
-      return NextResponse.json({ error: "userId required" }, { status: 400 });
+    import { collections } from "@/lib/firestore";
+    const userIdParam = request.nextUrl.searchParams.get("userId");
+    
+    let usersToProcess = [];
+    if (userIdParam) {
+      usersToProcess.push(userIdParam);
+    } else {
+      const usersSnap = await collections.users().get();
+      usersSnap.forEach(doc => usersToProcess.push(doc.id));
     }
 
-    const user = await getUser(userId);
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const timezone = user.preferences?.timezone || "UTC";
-
-    // Fetch queued emails
-    const queuedEmails = await getQueuedEmails(userId, 5); // Process 5 at a time to stay within timeout
-
-    if (queuedEmails.length === 0) {
+    if (usersToProcess.length === 0) {
       return NextResponse.json({ status: "ok", processed: 0 });
     }
+
+    let totalProcessed = 0;
+
+    for (const userId of usersToProcess) {
+      const user = await getUser(userId);
+      if (!user) continue;
+
+      const timezone = user.preferences?.timezone || "UTC";
+
+      // Fetch queued emails
+      const queuedEmails = await getQueuedEmails(userId, 5); // Process 5 at a time to stay within timeout
+      if (queuedEmails.length === 0) continue;
 
     let processed = 0;
 
@@ -167,9 +173,11 @@ export async function POST(request: NextRequest) {
         console.error(`Failed to process email ${email.id}:`, emailError);
         await updateEmail(email.id, { status: "error" });
       }
+
+      totalProcessed += processed;
     }
 
-    return NextResponse.json({ status: "ok", processed, total: queuedEmails.length });
+    return NextResponse.json({ status: "ok", processed: totalProcessed });
   } catch (error) {
     console.error("Process queue error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
