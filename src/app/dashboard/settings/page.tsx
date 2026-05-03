@@ -19,11 +19,25 @@ export default function SettingsPage() {
   const [digestFreq, setDigestFreq] = useState("daily");
   const [saved, setSaved] = useState(false);
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    // TODO: Save preferences to API
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telegramChatId: chatId,
+          timezone,
+          digestFrequency: digestFreq,
+        }),
+      });
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   return (
